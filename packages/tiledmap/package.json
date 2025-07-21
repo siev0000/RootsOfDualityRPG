@@ -1,0 +1,48 @@
+{
+  "name": "@rpgjs/tiledmap",
+  "version": "5.0.0-alpha.11",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/client/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./client": {
+      "import": "./dist/client/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./server": {
+      "import": "./dist/server/index.js",
+      "types": "./dist/server.d.ts"
+    }
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "description": "RPGJS is a framework for creating RPG/MMORPG games",
+  "peerDependencies": {
+    "@canvasengine/presets": "2.0.0-beta.25",
+    "@rpgjs/client": "workspace:*",
+    "@rpgjs/common": "workspace:*",
+    "@rpgjs/server": "workspace:*",
+    "@rpgjs/vite": "workspace:*",
+    "canvasengine": "2.0.0-beta.25"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@canvasengine/compiler": "2.0.0-beta.21",
+    "vite": "^6.2.5",
+    "vite-plugin-dts": "^4.5.3"
+  },
+  "type": "module",
+  "dependencies": {
+    "@canvasengine/tiled": "2.0.0-beta.25"
+  }
+}

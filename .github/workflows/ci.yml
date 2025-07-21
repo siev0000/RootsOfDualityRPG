@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "*"
+    paths-ignore:
+      - "docs/**"
+  pull_request:
+    branches:
+      - "*"
+    paths-ignore:
+      - "docs/**"
+
+jobs:
+  tests:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        node-version: [20]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "pnpm"
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile  
+      - name: Build
+        run: pnpm build
+
+  build_and_publish:
+      needs: tests
+      if: github.ref == 'refs/heads/v5'
+      strategy:
+        matrix:
+          os: [ubuntu-latest]
+          node-version: [lts/*]
+          pnpm-version: [latest]
+      runs-on: ${{ matrix.os }}
+      steps:
+        - name: ⬇️ Checkout
+          id: checkout
+          uses: actions/checkout@v4
+          with:
+            fetch-depth: 0
+  
+        - name: 🟢 Setup node
+          id: setup-node
+          uses: actions/setup-node@v4
+          with:
+            node-version: ${{ matrix.node-version }}
+  
+        - name: 🥡 Setup pnpm
+          id: setup-pnpm
+          uses: pnpm/action-setup@v4
+          with:
+            version: ${{ matrix.pnpm-version }}
+            run_install: false
+  
+        - name: 🎈 Get pnpm store directory
+          id: get-pnpm-cache-dir
+          run: |
+            echo "::set-output name=pnpm_cache_dir::$(pnpm store path)"
+  
+        - name: 🔆 Cache pnpm modules
+          uses: actions/cache@v4
+          id: pnpm-cache
+          with:
+            path: ${{ steps.get-pnpm-cache-dir.outputs.pnpm_cache_dir }}
+            key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+            restore-keys: |
+              ${{ runner.os }}-pnpm-store-
+  
+        - name: 🧩 Install Dependencies
+          id: install-dependencies
+          run: pnpm install --no-frozen-lockfile
+  
+        - name: 🏗️ Build
+          id: build-the-mono-repo
+          run: |
+            pnpm build
+  
+        - name: 📣 Change version and publish to npm
+          id: publish
+          run: |
+            pnpm run rpgjs:version
+            pnpm run rpgjs:publish
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            NPM_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

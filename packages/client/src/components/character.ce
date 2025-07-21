@@ -1,0 +1,147 @@
+<Container x y zIndex={y} viewportFollow={isMe} controls onBeforeDestroy>
+  @for (component of componentsBehind) {
+    <Container>
+      <component object />
+    </Container>
+  } 
+  <Particle emit={@emitParticleTrigger} settings={@particleSettings} zIndex={1000} name={particleName} />
+  <Container>
+    @for (graphicId of graphics) {
+      <Sprite sheet={@sheet(@graphicId)} direction tint hitbox />
+    }
+  </Container>
+  @for (component of componentsInFront) {
+    <Container>
+      <component object />
+    </Container>
+  } 
+</Container>
+
+<script>
+  import { signal, effect, mount, computed, tick } from "canvasengine";
+  import { lastValueFrom } from "rxjs";
+  import { Particle } from "@canvasengine/presets";
+  import { GameEngineToken, ModulesToken } from "@rpgjs/common";
+  import { RpgClientEngine } from "../RpgClientEngine";
+  import { inject } from "../core/inject";  
+  import { Direction } from "@rpgjs/common";
+  import Hit from "./effects/hit.ce";
+
+  const { object, id } = defineProps();
+  
+  const client = inject(RpgClientEngine);
+  const hooks = inject(ModulesToken);
+
+  const spritesheets = client.spritesheets;
+  const playerId = client.playerId;
+  const componentsBehind = client.spriteComponentsBehind;
+  const componentsInFront = client.spriteComponentsInFront;
+  const isMe = computed(() => id() === playerId);
+
+  const { 
+    x, 
+    y, 
+    tint, 
+    direction, 
+    animationName, 
+    animationCurrentIndex,
+    emitParticleTrigger, 
+    particleName, 
+    graphics, 
+    hitbox 
+  } = object;
+
+  const particleSettings = client.particleSettings;
+
+  const canControls = () => isMe() && object.canMove()
+  const keyboardControls = client.globalConfig.keyboardControls;
+
+  const controls = signal({
+    down: {
+      repeat: true,
+      bind: keyboardControls.down,
+      keyDown() {
+        if (canControls()) client.processInput({ input: Direction.Down })
+      },
+    },
+    up: {
+      repeat: true,
+      bind: keyboardControls.up,
+      keyDown() {
+        if (canControls()) client.processInput({ input: Direction.Up })
+      },
+    },
+    left: {
+      repeat: true,
+      bind: keyboardControls.left,
+      keyDown() {
+        if (canControls()) client.processInput({ input: Direction.Left })
+      },
+    },
+    right: {
+      repeat: true,
+      bind: keyboardControls.right,
+      keyDown() {
+        if (canControls()) client.processInput({ input: Direction.Right })
+      },
+    },
+    action: {
+      bind: keyboardControls.action,
+      keyDown() {
+        if (canControls()) {
+          client.processAction({ action: 'action' })
+           // particleName.set('hit') 
+          // emitParticleTrigger.start()
+          // object.flash('red')
+        }
+      },
+    },
+  });
+
+  const sheet = (graphicId) => {
+    return {
+      definition: spritesheets.get(graphicId),
+      playing: animationName,
+      params: {
+        direction
+      },
+      onFinish() {
+        animationCurrentIndex.update(index => index + 1)
+      }
+    };
+  }
+
+  // Track animation changes to reset animation state when needed
+  let previousAnimationName = animationName();
+  effect(() => {
+    const currentAnimationName = animationName();
+    
+    // If animation changed externally (not through setAnimation), reset the state
+    if (currentAnimationName !== previousAnimationName && object.animationIsPlaying && object.animationIsPlaying()) {
+      // Check if this is a movement animation (walk, stand) that should interrupt custom animations
+      const movementAnimations = ['walk', 'stand'];
+      if (movementAnimations.includes(currentAnimationName)) {
+        if (typeof object.resetAnimationState === 'function') {
+          object.resetAnimationState();
+        }
+      }
+    }
+    
+    previousAnimationName = currentAnimationName;
+    
+  });
+
+  const onBeforeDestroy = async () => {
+    await lastValueFrom(hooks.callHooks("client-sprite-onDestroy", object)) 
+    await lastValueFrom(hooks.callHooks("client-sceneMap-onRemoveSprite", client.sceneMap, object))
+  }
+
+  mount((element) => {
+    hooks.callHooks("client-sprite-onAdd", object).subscribe()
+    hooks.callHooks("client-sceneMap-onAddSprite", client.sceneMap, object).subscribe()
+  })
+
+  tick(() => {
+    hooks.callHooks("client-sprite-onUpdate").subscribe()
+  })
+</script>
